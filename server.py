@@ -20,6 +20,7 @@ def webServer(port):
 
             headerLine = 'HTTP/1.1 200 OK\r\n' #header line containing response status code and status phrase
             connectionSocket.send(headerLine.encode()) #encoding to send back
+            connectionSocket.send("Content-Type: text/html\r\n".encode())
             connectionSocket.send('\r\n'.encode()) #carriage return otherwise the headers won't be displayed
 
             for i in range(0, len(outputdata)):
