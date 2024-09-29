@@ -2,9 +2,9 @@ from socket import *
 import sys
 
 def webServer(port):
-    serverPort = port
+    serverPort = port 
     serverSocket = socket(AF_INET, SOCK_STREAM)#server socket - TCP byte stream
-    serverSocket.bind(('',serverPort))
+    serverSocket.bind(('',serverPort)) #binding port to server port
     serverSocket.listen(1) #server begins listening for incoming requests
     print('Server being set up...')
 
@@ -13,14 +13,14 @@ def webServer(port):
         connectionSocket, addr = serverSocket.accept() #server waits on accept new socket returned on request as this is TCP
         print('Request accepted from:', addr)
         try:
-            message = connectionSocket.recv(1024).decode()
+            message = connectionSocket.recv(1024).decode() #decodes the received byte stream message
             filename = message.split()[1]
             f = open(filename[1:],'r')
             outputdata = f.read()
 
-            headerLine = 'HTTP/1.1 200 OK\r\n'
-            connectionSocket.send(headerLine.encode())
-            connectionSocket.send('\r\n'.encode())
+            headerLine = 'HTTP/1.1 200 OK\r\n' #header line containing response status code and status phrase
+            connectionSocket.send(headerLine.encode()) #encoding to send back
+            connectionSocket.send('\r\n'.encode()) #carriage return otherwise the headers won't be displayed
 
             for i in range(0, len(outputdata)):
                 connectionSocket.send(outputdata[i].encode())
