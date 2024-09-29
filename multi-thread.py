@@ -35,7 +35,7 @@ def webServer(port):
     serverPort = port
     serverSocket = socket(AF_INET, SOCK_STREAM)
     serverSocket.bind(('', serverPort))
-    serverSocket.listen(5) #this is for multiple connections - 5
+    serverSocket.listen(4) #this is for multiple connections - 4 connections
     print('Server being set up...')
 
     while True:
