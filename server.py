@@ -31,12 +31,16 @@ def webServer(port):
             errHeaderLine = 'HTTP/1.1 404 Not Found\r\n'
             connectionSocket.send(errHeaderLine.encode())
             connectionSocket.send('\r\n'.encode())
-            with open('404page.html', 'r') as f2:  # Open the 404 error page
-                outputdata_err = f2.read()
-                connectionSocket.send(outputdata_err.encode())  # Send the error page
-            connectionSocket.close()  # Close the connection to this client
 
-# Removed the closing of serverSocket and sys.exit()
+            try:
+                with open('404page.html', 'r') as f2:  # Open the 404 error page
+                    outputdata_err = f2.read()
+                    connectionSocket.send(outputdata_err.encode())  # Send the error page
+            except IOError:
+                # If the 404 page is also missing, just close the connection
+                print("404 page not found.")
+            
+            connectionSocket.close()  # Close the connection to this client
 
 if __name__ == '__main__':
     webServer(6879)
