@@ -3,14 +3,14 @@ import sys
 
 def webServer(port):
     serverPort = port
-    serverSocket = socket(AF_INET, SOCK_STREAM)
+    serverSocket = socket(AF_INET, SOCK_STREAM)#server socket - TCP byte stream
     serverSocket.bind(('',serverPort))
     serverSocket.listen(1) #server begins listening for incoming requests
     print('Server being set up...')
 
     while True:
         print ('Server is ready !')
-        connectionSocket, addr = serverSocket.accept() #server waits on accept new socket returned on request
+        connectionSocket, addr = serverSocket.accept() #server waits on accept new socket returned on request as this is TCP
         print('Request accepted from:', addr)
         try:
             message = connectionSocket.recv(1024).decode()
