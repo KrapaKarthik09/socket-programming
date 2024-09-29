@@ -1,5 +1,5 @@
 from socket import *
-import sys
+import sys # In order to terminate the program
 
 def webServer(port):
     serverPort = port 
@@ -9,7 +9,7 @@ def webServer(port):
     print('Server being set up...')
 
     while True:
-        print ('Server is ready !')
+        print ('Ready to serve...')
         connectionSocket, addr = serverSocket.accept() #server waits on accept new socket returned on request as this is TCP
         print('Request accepted from:', addr)
         try:
