@@ -8,7 +8,7 @@ def ping(host, port):
     clientSocket = socket(AF_INET, SOCK_DGRAM) #UDP Socket
     clientSocket.settimeout(1)  #setting timeout value of 1s
     
-    for seq in range(1, 11):
+    for seq in range(10):
         startTime = time()  #time capture when ping is sent
         message = f"Ping {seq} {ctime(startTime)[11:19]}"  #ping message
         
