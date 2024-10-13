@@ -1,5 +1,3 @@
-# Import socket module
-# Import time to retrieve current time
 from socket import *
 import time
 import sys
