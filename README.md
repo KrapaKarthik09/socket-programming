@@ -2,4 +2,4 @@
 Krapa Karthik 
 NYU ID: N12039854 
 NET ID: kk5754
-Socket Programming Assignment
+Socket Programming Lab 2: UDP Pinger Lab
