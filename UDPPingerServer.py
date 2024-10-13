@@ -1,37 +1,51 @@
-#UDPPingerServer.py
 import random
 from socket import *
 import time
 import hashlib
 import sys
-def serve(port):
-  # Create a UDP socket
-  # Notice the use of SOCK_DGRAM for UDP packets
-  serverSocket = socket(AF_INET, SOCK_DGRAM)
-  # Assign IP address and port number to socket
-  serverSocket.bind(('', port))
-  while True:
-    # Generate random number in the range of 0 to 10
-    try:
-      rand = random.randint(0, 10)
-      # Receive the client packet along with the address it is coming from
-      message, address = serverSocket.recvfrom(1024)
-      s_time = time.time()
-      # If rand is less is than 4, we consider the packet lost and do not respond
-      if rand < 4:
-        continue
-      m = message.decode().split()
-      seq = m[1]
-      c_time = m[2]
-      h = hashlib.md5('seq:{0},c_time:{1},s_time:{2},key:{3}'.format(seq, c_time, str(s_time), 'randomkey').encode()).hexdigest()
-      print(m)
-      resp = 'Reply {0} {1} {2} {3}\n'.format(seq, c_time, str(s_time), h)
-      # Otherwise, the server responds
-      serverSocket.sendto(resp.encode(), address)
-    except KeyboardInterrupt:
-      serverSocket.close()
-      sys.exit()
-    except:
-      continue
+
+def serve(port, timeout=10):  # Added timeout parameter for server socket
+    serverSocket = socket(AF_INET, SOCK_DGRAM)
+    serverSocket.bind(('', port))
+    
+    # Set a timeout for the server socket to avoid indefinite waiting
+    serverSocket.settimeout(timeout)
+    
+    print(f"Server is running on port {port} with {timeout} seconds timeout.")
+    
+    while True:
+        try:
+            rand = random.randint(0, 10)
+            
+            # Try receiving the client message
+            message, address = serverSocket.recvfrom(1024)  # This blocks till data is received or times out
+            s_time = time.time()
+
+            # If rand < 4, simulate packet loss by ignoring the message
+            if rand < 4:
+                continue
+
+            # Decode message and construct server reply
+            m = message.decode().split()
+            seq = m[1]
+            c_time = m[2]
+            h = hashlib.md5(f'seq:{seq},c_time:{c_time},s_time:{s_time},key:randomkey'.encode()).hexdigest()
+
+            # Reply format: "Reply <sequence_number> <client_time> <server_time> <message_digest>"
+            resp = f'Reply {seq} {c_time} {s_time} {h}\n'
+            
+            # Send the reply back to the client
+            serverSocket.sendto(resp.encode(), address)
+        
+        except timeout:
+            # Break out of the loop if no messages are received within the timeout period
+            print("Server timed out waiting for messages. Closing server.")
+            break  # Exit the while loop after timeout
+
+        except KeyboardInterrupt:
+            print("Server shutting down.")
+            serverSocket.close()
+            sys.exit()
+
 if __name__ == '__main__':
-  serve(12000)
+    serve(12000, timeout=15)  # Setting a 15-second timeout for the server

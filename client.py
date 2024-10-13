@@ -4,7 +4,7 @@ import sys
 
 def ping(host, port):
     clientSocket = socket(AF_INET, SOCK_DGRAM)
-    clientSocket.settimeout(1)  # Set timeout to 1 second
+    clientSocket.settimeout(1)  # Timeout set to 1 second for each ping
     
     for seq in range(1, 11):  # Sequence numbers from 1 to 10
         startTime = time()  # Current time in seconds (floating-point)
@@ -21,7 +21,7 @@ def ping(host, port):
             # Decode and parse the server response
             server_reply = encodedModified.decode()
 
-            # Calculate RTT (in seconds, not milliseconds)
+            # Calculate RTT (in seconds)
             rtt = endTime - startTime
 
             # Print the server reply and RTT
