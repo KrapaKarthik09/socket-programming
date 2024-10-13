@@ -1,5 +1,5 @@
 from socket import *
-from time import time
+from time import time, ctime
 import sys
 
 def ping(host, port):
@@ -13,6 +13,7 @@ def ping(host, port):
         try:
             # Send the message
             clientSocket.sendto(message.encode(), (host, port))
+            print(f"Sent: {message}")  # Debug message
             
             # Receive the reply from the server
             encodedModified, serverAddress = clientSocket.recvfrom(1024)
