@@ -1,7 +1,7 @@
 # Import socket module
 # Import time and ctime to retrieve time
 from socket import *
-from time import time, ctime
+from time import time
 import sys
 
 # Define server host and port
@@ -14,7 +14,7 @@ clientSocket.settimeout(1)
 
 for i in range(10):
     startTime = time()  # Retrieve the current time
-    message = f"Ping {i+1} {startTime:.6f}"  # Include time in seconds
+    message = f"Ping {i + 1} {startTime:.6f}"  # Include time in seconds
 
     try:
         # Sending the message and waiting for the answer
