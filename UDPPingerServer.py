@@ -2,7 +2,6 @@ import random
 from socket import *
 import time
 import hashlib
-import sys
 
 def serve(port, timeout=10):  
     serverSocket = socket(AF_INET, SOCK_DGRAM)
@@ -15,7 +14,6 @@ def serve(port, timeout=10):
     
     while True:
         try:
-            rand = random.randint(0, 10)
             print("Waiting for a message...")  # Debug message
             
             # Try receiving the client message
@@ -23,9 +21,6 @@ def serve(port, timeout=10):
             print(f"Received message from {address}: {message.decode()}")  # Print received message
             
             s_time = time.time()
-            if rand < 4:
-                print("Simulating packet loss. Ignoring message.")
-                continue
             
             # Decode message and construct server reply
             m = message.decode().split()

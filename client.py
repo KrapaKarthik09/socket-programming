@@ -32,6 +32,8 @@ def ping(host, port):
         except timeout:
             # Handle case where server does not respond
             print(f"PING {seq} Request timed out\n")
+        except Exception as e:
+            print(f"An error occurred: {e}")  # Log any unexpected errors
 
     # Close the socket after all pings
     clientSocket.close()
