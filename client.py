@@ -1,3 +1,5 @@
+# Import socket module
+# Import time to retrieve current time
 from socket import *
 import time
 import sys
@@ -5,42 +7,28 @@ import sys
 def ping(host, port):
     resps = []
     clientSocket = socket(AF_INET, SOCK_DGRAM)
-    clientSocket.settimeout(1)  # Set timeout for the socket
+    clientSocket.settimeout(1)
 
     for seq in range(1, 11):
-        startTime = time.time()  # Get the current time
-        message = f"Ping {seq} {startTime:.6f}"  # Create the ping message
+        startTime = time.time()  # Retrieve the current time
+        message = "Ping {} {}".format(seq, startTime)
 
         try:
-            # Send the message to the server
+            # Sending the message and waiting for the answer
             clientSocket.sendto(message.encode(), (host, port))
+            encodedModified, serverAddress = clientSocket.recvfrom(1024)
 
-            # Wait for a response from the server
-            encodedReply, serverAddress = clientSocket.recvfrom(1024)
-            endTime = time.time()  # Get the end time after receiving response
-
-            # Decode the server's reply
-            server_reply = encodedReply.decode()
-
-            # Calculate round trip time (RTT)
+            # Checking the current time and if the server answered
+            endTime = time.time()
+            modifiedMessage = encodedModified.decode()
             rtt = (endTime - startTime) * 1000  # Convert to milliseconds
-
-            # Append successful response to results
-            resps.append((seq, server_reply.strip(), rtt))
-
+            resps.append((seq, modifiedMessage, rtt))
         except timeout:
-            # If a timeout occurs, append the timeout message
             resps.append((seq, 'Request timed out', 0))
 
-    clientSocket.close()  # Close the socket
+    clientSocket.close()
     return resps
 
 if __name__ == '__main__':
-    # Usage: python client.py <server_host> <server_port>
-    if len(sys.argv) != 3:
-        print("Usage: python client.py <server_host> <server_port>")
-        sys.exit(1)
-
-    serverHost, serverPort = sys.argv[1], int(sys.argv[2])
-    responses = ping(serverHost, serverPort)
-    print(responses)
+    resps = ping('127.0.0.1', 12000)
+    print(resps)
