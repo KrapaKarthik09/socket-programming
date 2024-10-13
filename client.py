@@ -1,43 +1,36 @@
+# Import socket module
+# Import time and ctime to retrieve time
+# Import sys to retrieve the arguments
 from socket import *
 from time import time, ctime
 import sys
 
-def ping(host, port):
-    clientSocket = socket(AF_INET, SOCK_DGRAM)
-    clientSocket.settimeout(1)  # Timeout set to 1 second for each ping
-    
-    for seq in range(1, 11):  # Sequence numbers from 1 to 10
-        startTime = time()  # Current time in seconds (floating-point)
-        message = f"Ping {seq} {startTime}"  # Message format
-        
-        try:
-            # Send the message
-            clientSocket.sendto(message.encode(), (host, port))
-            print(f"Sent: {message}")  # Debug message
-            
-            # Receive the reply from the server
-            encodedModified, serverAddress = clientSocket.recvfrom(1024)
-            endTime = time()  # Time when response is received
+# Checking to see if we have three arguments
+if (len(sys.argv) != 3):
+    print("Wrong number of arguments.")
+    print("Use: UDPPingClient.py <server_host> <server_port>")
+    sys.exit()
 
-            # Decode and parse the server response
-            server_reply = encodedModified.decode()
+# Preparing the socket
+serverHost, serverPort = sys.argv[1:]
+clientSocket = socket(AF_INET, SOCK_DGRAM)
+clientSocket.settimeout(1)
 
-            # Calculate RTT (in seconds)
-            rtt = endTime - startTime
+for i in range(10):
+    startTime = time() # Retrieve the current time
+    message = "Ping " + str(i+1) + " " + ctime(startTime)[11:19]
 
-            # Print the server reply and RTT
-            print(f"Reply from {serverAddress}: {server_reply}")
-            print(f"RTT: {rtt:.6f} seconds\n")  # RTT in floating-point seconds (6 decimal places)
+    try:
+        # Sending the message and waiting for the answer
+        clientSocket.sendto(message.encode(),(serverHost, int(serverPort)))
+        encodedModified, serverAddress = clientSocket.recvfrom(1024)
 
-        except timeout:
-            # Handle case where server does not respond
-            print(f"PING {seq} Request timed out\n")
-        except Exception as e:
-            print(f"An error occurred: {e}")  # Log any unexpected errors
+        # Checking the current time and if the server answered
+        endTime = time()
+        modifiedMessage = encodedModified.decode()
+        print(modifiedMessage)
+        print("RTT: %.3f ms\n" % ((endTime - startTime)*1000))
+    except:
+        print("PING %i Request timed out\n" % (i+1))
 
-    # Close the socket after all pings
-    clientSocket.close()
-
-# Run the ping function if this script is executed directly
-if __name__ == '__main__':
-    ping('127.0.0.1', 12000)  # Test by pinging localhost (127.0.0.1)
+clientSocket.close()

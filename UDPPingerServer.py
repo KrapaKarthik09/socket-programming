@@ -2,43 +2,53 @@ import random
 from socket import *
 import time
 import hashlib
+import sys
 
-def serve(port, timeout=10):  
+def serve(port):
+    # Create a UDP socket
+    # Notice the use of SOCK_DGRAM for UDP packets
     serverSocket = socket(AF_INET, SOCK_DGRAM)
-    serverSocket.bind(('', port))  # Bind to all interfaces on the specified port
-    
-    # Set a timeout for the server socket to avoid indefinite waiting
-    serverSocket.settimeout(timeout)
-    
-    print(f"Server is running on port {port} with {timeout} seconds timeout.")
-    
+    # Assign IP address and port number to socket
+    serverSocket.bind(('', port))
+    print(f"Server listening on port {port}")
+
     while True:
         try:
-            print("Waiting for a message...")  # Debug message
-            
-            # Try receiving the client message
-            message, address = serverSocket.recvfrom(1024)  # This blocks till data is received or times out
-            print(f"Received message from {address}: {message.decode()}")  # Print received message
-            
+            # Generate random number in the range of 0 to 10
+            rand = random.randint(0, 10)
+
+            # Receive the client packet along with the address it is coming from
+            message, address = serverSocket.recvfrom(1024)
             s_time = time.time()
-            
-            # Decode message and construct server reply
+
+            # If rand is less than 4, we consider the packet lost and do not respond
+            if rand < 4:
+                print(f"Packet lost: {message.decode()}")  # Log lost packet
+                continue
+
+            # Decode the message and extract sequence and client time
             m = message.decode().split()
             seq = m[1]
             c_time = m[2]
-            h = hashlib.md5(f'seq:{seq},c_time:{c_time},s_time:{s_time},key:randomkey'.encode()).hexdigest()
 
-            # Reply format: "Reply <sequence_number> <client_time> <server_time> <message_digest>"
+            # Create a message digest (MD5 hash) using the provided format
+            key = 'randomkey'  # Use the actual secret key for grading
+            h = hashlib.md5(f'seq:{seq},c_time:{c_time},s_time:{s_time},key:{key}'.encode()).hexdigest()
+
+            # Prepare the response
             resp = f'Reply {seq} {c_time} {s_time} {h}\n'
-            serverSocket.sendto(resp.encode(), address)
-        
-        except timeout:
-            print("Server timed out waiting for messages. Closing server.")
-            break  # Exit the while loop after timeout
 
+            # Send the response to the client
+            serverSocket.sendto(resp.encode(), address)
+            print(f"Responded to {address}: {resp.strip()}")  # Log response
+
+        except KeyboardInterrupt:
+            print("Server shutting down...")
+            serverSocket.close()
+            sys.exit()
         except Exception as e:
             print(f"An error occurred: {e}")
-            break  # Exit on unexpected error
+            continue
 
 if __name__ == '__main__':
-    serve(12000, timeout=15)  # Setting a 15-second timeout for the server
+    serve(12000)  # Start the server on port 12000
