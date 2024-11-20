@@ -74,8 +74,8 @@ def doOnePing(destAddr, timeout):
     icmp = getprotobyname("icmp")
     mySocket = socket(AF_INET, SOCK_RAW, icmp)
     myID = os.getpid() & 0xFFFF  # Get process ID for unique identifier
-    sendTime = sendOnePing(mySocket, destAddr, myID)
-    result = receiveOnePing(mySocket, myID, timeout, destAddr, sendTime)
+    sendOnePing(mySocket, destAddr, myID)
+    result = receiveOnePing(mySocket, myID, timeout, destAddr)
     mySocket.close()
     return result
 
