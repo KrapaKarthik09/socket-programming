@@ -6,16 +6,16 @@ import time
 import select
 
 ICMP_ECHO_REQUEST = 8  # ICMP Type
-IP_HEADER_SIZE = 20
+IP_HEADER_SIZE = 20    #Standard size
 
 def checksum(string):
-    csum = 0
+    csum = 0 #initialize checksum
     countTo = (len(string) // 2) * 2
     count = 0
     while count < countTo:
         thisVal = (string[count + 1]) * 256 + (string[count])
         csum += thisVal
-        csum &= 0xffffffff
+        csum &= 0xffffffff #Keeping checksum within 32 bytes
         count += 2
     if countTo < len(string):
         csum += (string[len(string) - 1])
@@ -28,26 +28,27 @@ def checksum(string):
     return answer
 
 def receiveOnePing(mySocket, ID, timeout, destAddr):
-    timeLeft = timeout
+    timeLeft = timeout  #setting timeout value
     while True:
-        startedSelect = time.time()
-        whatReady = select.select([mySocket], [], [], timeLeft)
-        howLongInSelect = (time.time() - startedSelect)
+        startedSelect = time.time() #start time
+        whatReady = select.select([mySocket], [], [], timeLeft) #incoming data
+        howLongInSelect = (time.time() - startedSelect) #time spent
         if whatReady[0]==[]:  # Timeout
             return (None, None)
-        timeReceived = time.time()
-        recPacket, addr = mySocket.recvfrom(1024)
+        timeReceived = time.time() #packet received time
+        recPacket, addr = mySocket.recvfrom(1024) #receive packet and sender's address
 
-        # Extract ICMP header fields from the received packet
+        #Extract ICMP header fields from the received packet
+        #fill in start
         icmpHeader = recPacket[IP_HEADER_SIZE:IP_HEADER_SIZE + 8]
         icmpType, icmpCode, checksum, packetID, sequence = struct.unpack("bbHHh", icmpHeader)
         if packetID == ID:
-            # Extract the data payload
+            #Extract the data payload
             data = recPacket[IP_HEADER_SIZE + 8:]
             sendTimestamp = struct.unpack("d", data)[0]
-            return ((timeReceived - sendTimestamp) * 1000,  # RTT in ms
+            return ((timeReceived - sendTimestamp) * 1000,  #RTT in ms
                     (icmpType, icmpCode, checksum, packetID, sequence, sendTimestamp))
-        
+        #fill in end
         timeLeft -= howLongInSelect
         if timeLeft <= 0:
             return (None, None)

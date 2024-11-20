@@ -27,30 +27,30 @@ def checksum(data):
     answer = answer >> 8 | (answer << 8 & 0xff00)
     return answer
 
-def unpack_icmp_packet(packet):
-    icmp_header = struct.unpack_from("bbHHh8s", packet, offset=IP_HEADER_SIZE)
-    return {
-        "type": icmp_header[0],
-        "code": icmp_header[1],
-        "checksum": icmp_header[2],
-        "identifier": icmp_header[3],
-        "sequence": icmp_header[4],
-        "data": struct.unpack("d", icmp_header[5])[0],
-    }
-
-def receive_one_ping(sock, ID, timeout, dest_addr, send_time):
-    time_left = timeout
+def receive_one_ping(mySocket, ID, timeout, dest_addr):
+    timeLeft = timeout
     while True:
-        started_select = time.time()
-        what_ready = select.select([sock], [], [], time_left)
-        how_long_in_select = time.time() - started_select
-        if not what_ready[0]:  # Timeout
-            return None, None
-        time_received = time.time()
-        rec_packet, _ = sock.recvfrom(1024)
-        icmp_packet = unpack_icmp_packet(rec_packet)
-        rtt = (time_received - send_time) * 1000  # RTT in ms
-        return rtt, icmp_packet
+        startedSelect = time.time()
+        whatReady = select.select([mySocket], [], [], timeLeft)
+        howLongInSelect = (time.time() - startedSelect)
+        if whatReady[0]==[]:  # Timeout
+            return (None, None)
+        timeReceived = time.time()
+        recPacket, addr = mySocket.recvfrom(1024)
+
+        # Extract ICMP header fields from the received packet
+        icmpHeader = recPacket[IP_HEADER_SIZE:IP_HEADER_SIZE + 8]
+        icmpType, icmpCode, checksum, packetID, sequence = struct.unpack("bbHHh", icmpHeader)
+        if packetID == ID:
+            # Extract the data payload
+            data = recPacket[IP_HEADER_SIZE + 8:]
+            sendTimestamp = struct.unpack("d", data)[0]
+            return ((timeReceived - sendTimestamp) * 1000,  # RTT in ms
+                    (icmpType, icmpCode, checksum, packetID, sequence, sendTimestamp))
+        
+        timeLeft -= howLongInSelect
+        if timeLeft <= 0:
+            return (None, None)
 
 def send_one_ping(sock, dest_addr, ID):
     checksum_val = 0
@@ -67,22 +67,22 @@ def do_one_ping(dest_addr, timeout):
     icmp = getprotobyname("icmp")
     sock = socket(AF_INET, SOCK_RAW, icmp)
     ID = os.getpid() & 0xFFFF
-    send_time = send_one_ping(sock, dest_addr, ID)
-    result = receive_one_ping(sock, ID, timeout, dest_addr, send_time)
+    send_one_ping(sock, dest_addr, ID)
+    result = receive_one_ping(sock, ID, timeout, dest_addr)
     sock.close()
     return result
 
 def ping(host, timeout=1):
     dest = gethostbyname(host)
     print(f"Pinging {dest} using Python:")
-    min_rtt, max_rtt, avg_rtt, total_received = float('inf'), 0, 0, 0
+    min_rtt, max_rtt, total_rtt, total_received = float('inf'), 0, 0, 0
 
     for i in range(5):
         rtt, _ = do_one_ping(dest, timeout)
         if rtt:
             min_rtt = min(min_rtt, rtt)
             max_rtt = max(max_rtt, rtt)
-            avg_rtt = ((avg_rtt * total_received) + rtt) / (total_received + 1)
+            total_rtt+=rtt
             total_received += 1
         time.sleep(1)
 
@@ -90,7 +90,7 @@ def ping(host, timeout=1):
     print("\n--- PING STATISTICS ---")
     print(f"Packets Sent: 5, Packets Received: {total_received}, Packet Loss: {packet_loss:.1f}%")
     if total_received > 0:
-        print(f"RTT (ms): min={min_rtt:.2f}, avg={avg_rtt:.2f}, max={max_rtt:.2f}")
+        print(f"RTT (ms): min={min_rtt:.2f}ms, avg={(total_rtt/total_received):.2f}ms, max={max_rtt:.2f}ms")
 
 if __name__ == "__main__":
     ping("google.com")
