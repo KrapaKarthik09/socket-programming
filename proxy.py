@@ -89,6 +89,11 @@ def forward_and_cache_response(sockf, fileCachePath, clisockf):
                 cachef.write(data)
             data = sockf.read(4096)
         # Fill in end.
+    except Exception as e:
+        print(e)
+    finally:
+        if cachef is not None:
+            cachef.close()
 
 # Forward a client request to a server
 # sockf: Socket file object connected to server
