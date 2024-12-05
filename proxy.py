@@ -68,41 +68,27 @@ def parse_http_headers(sockf):
 # clisockf: Socket file object connected to client
 def forward_and_cache_response(sockf, fileCachePath, clisockf):
     cachef = None
-
-    # Create the intermediate directories to the cache file
     if fileCachePath is not None:
         os.makedirs(os.path.dirname(fileCachePath), exist_ok=True)
-        # Open/create cache file
         cachef = open(fileCachePath, 'w+b')
-
     try:
-        # Read response from server
         statusLine, headers = parse_http_headers(sockf)
-        # Filter out the Connection header from the server
         headers = [h for h in headers if h[0] != 'Connection']
-        # Replace with our own Connection header
-        # We will close all connections after sending the response.
-        # This is an inefficient,  single-threaded proxy!
         headers.append(('Connection', 'close'))
+        
         # Fill in start.
         clisockf.write(f"{statusLine}\r\n".encode())
         for header in headers:
             clisockf.write(f"{header[0]}: {header[1]}\r\n".encode())
         clisockf.write(b"\r\n")
-
-        while True:
-            chunk = interruptible_recv(sockf, 4096)
-            if not chunk:
-                 break
-            clisockf.write(chunk)
-            if cachef and statusLine.split()[1] == "200":  # Only cache successful responses
-                 cachef.write(chunk)
+        
+        data = sockf.read(4096)
+        while data:
+            clisockf.write(data)
+            if cachef:
+                cachef.write(data)
+            data = sockf.read(4096)
         # Fill in end.
-    except Exception as e:
-        print(e)
-    finally:
-        if cachef is not None:
-            cachef.close()
 
 # Forward a client request to a server
 # sockf: Socket file object connected to server
@@ -221,6 +207,8 @@ def proxyServer(port):
     # Fill in start.
     if tcpCliSock:
         tcpCliSock.close()
+    if c :
+        c.close()
     tcpSerSock.close()
     # Fill in end.
     sys.exit()
