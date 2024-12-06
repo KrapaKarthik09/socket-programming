@@ -39,7 +39,7 @@ def parse_http_headers(sockf):
         if headerPartitions[1] == '':
             continue
         headers.append((headerPartitions[0].strip(), headerPartitions[2].strip()))
-    return(headline, headers)
+    return (headline, headers)
 
 def forward_and_cache_response(sockf, fileCachePath, clisockf):
     cachef = None
@@ -62,7 +62,7 @@ def forward_and_cache_response(sockf, fileCachePath, clisockf):
             if cachef:
                 cachef.write(data)
     except Exception as e:
-        print(e)
+        print(f"Error while forwarding and caching response: {e}")
     finally:
         if cachef is not None:
             cachef.close()
@@ -84,13 +84,13 @@ def proxyServer(port):
         shutil.rmtree(cacheDir)
     tcpSerSock = socket(AF_INET, SOCK_STREAM)
     tcpSerSock.bind(('', port))
-    tcpSerSock.listen(1)
+    tcpSerSock.listen(5)
     tcpCliSock = None
     try:
         while True:
             print('Ready to serve...')
             tcpCliSock, addr = interruptible_accept(tcpSerSock)
-            print('Received a connection from:', addr)
+            print(f'Received a connection from: {addr}')
             cliSock_f = tcpCliSock.makefile('rwb', 0)
             requestLine, requestHeaders = parse_http_headers(cliSock_f)
             if len(requestLine) == 0:
@@ -112,7 +112,7 @@ def proxyServer(port):
             if fileCachePath and cached:
                 with open(fileCachePath, 'rb') as cache_file:
                     cliSock_f.write(cache_file.read())
-                print('Read from cache')
+                print(f'Read from cache: {fileCachePath}')
             else:
                 c = socket(AF_INET, SOCK_STREAM)
                 hostn = filename.partition('/')[0]
@@ -122,7 +122,7 @@ def proxyServer(port):
                     forward_request(fileobj, f'/{filename.partition("/")[2]}', hostn, requestLine, requestHeaders, cliSock_f)
                     forward_and_cache_response(fileobj, fileCachePath, cliSock_f)
                 except Exception as e:
-                    print(e)
+                    print(f"Error connecting to host {hostn}: {e}")
                 finally:
                     c.close()
             cliSock_f.close()
