@@ -43,17 +43,23 @@ def parse_http_headers(sockf):
 
 def forward_and_cache_response(sockf, fileCachePath, clisockf):
     cachef = None
-    if fileCachePath is not None:
-        os.makedirs(os.path.dirname(fileCachePath), exist_ok=True)
-        cachef = open(fileCachePath, 'w+b')
     try:
+        if fileCachePath is not None:
+            os.makedirs(os.path.dirname(fileCachePath), exist_ok=True)
+            cachef = open(fileCachePath, 'w+b')
+
+        # Parse the response headers
         statusLine, headers = parse_http_headers(sockf)
-        headers = [h for h in headers if h[0] != 'Connection']
+        headers = [h for h in headers if h[0].lower() != 'connection']
         headers.append(('Connection', 'close'))
+
+        # Forward response headers
         clisockf.write(f"{statusLine}\r\n".encode())
         for header in headers:
             clisockf.write(f"{header[0]}: {header[1]}\r\n".encode())
         clisockf.write(b"\r\n")
+
+        # Forward response body
         while True:
             data = sockf.read(4096)
             if not data:
@@ -62,78 +68,93 @@ def forward_and_cache_response(sockf, fileCachePath, clisockf):
             if cachef:
                 cachef.write(data)
     except Exception as e:
-        print(f"Error while forwarding and caching response: {e}")
+        print(f"Error while forwarding response: {e}")
     finally:
-        if cachef is not None:
+        if cachef:
             cachef.close()
 
 def forward_request(sockf, requestUri, hostn, origRequestLine, origHeaders, cliSock_f):
-    headers = [h for h in origHeaders if h[0] != 'Host']
-    headers.append(('Host', hostn))
-    sockf.write(f"{origRequestLine}\r\n".encode())
-    for header in headers:
-        sockf.write(f"{header[0]}: {header[1]}\r\n".encode())
-    sockf.write(b"\r\n")
-    if origRequestLine.startswith("POST"):
-        content_length = int(dict(origHeaders).get('Content-Length', 0))
-        body = interruptible_read(cliSock_f, content_length)
-        sockf.write(body)
+    try:
+        headers = [h for h in origHeaders if h[0].lower() != 'host']
+        headers.append(('Host', hostn))
+
+        # Forward the request
+        sockf.write(f"{origRequestLine}\r\n".encode())
+        for header in headers:
+            sockf.write(f"{header[0]}: {header[1]}\r\n".encode())
+        sockf.write(b"\r\n")
+
+        # Forward POST body if applicable
+        if origRequestLine.startswith("POST"):
+            content_length = int(dict(origHeaders).get('Content-Length', 0))
+            body = cliSock_f.read(content_length)
+            sockf.write(body)
+    except Exception as e:
+        print(f"Error while forwarding request: {e}")
 
 def proxyServer(port):
     if os.path.isdir(cacheDir):
         shutil.rmtree(cacheDir)
+
     tcpSerSock = socket(AF_INET, SOCK_STREAM)
+    tcpSerSock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     tcpSerSock.bind(('', port))
     tcpSerSock.listen(5)
-    tcpCliSock = None
+
     try:
         while True:
-            print('Ready to serve...')
+            print("Proxy ready to serve...")
             tcpCliSock, addr = interruptible_accept(tcpSerSock)
-            print(f'Received a connection from: {addr}')
+            print(f"Received connection from {addr}")
             cliSock_f = tcpCliSock.makefile('rwb', 0)
-            requestLine, requestHeaders = parse_http_headers(cliSock_f)
-            if len(requestLine) == 0:
-                tcpCliSock.close()
-                continue
-            requestUri = requestLine.split()[1]
-            uri_parts = requestUri.partition('http://')
-            if uri_parts[1] == '':
-                filename = requestUri.partition('/')[2]
-            else:
-                filename = uri_parts[2]
-            method = requestLine.split()[0]
-            if method == "GET":
-                fileCachePath = os.path.join(cacheDir, filename.replace('/', '_'))
-                cached = os.path.exists(fileCachePath)
-            else:
-                fileCachePath = None
-                cached = False
-            if fileCachePath and cached:
-                with open(fileCachePath, 'rb') as cache_file:
-                    cliSock_f.write(cache_file.read())
-                print(f'Read from cache: {fileCachePath}')
-            else:
-                c = socket(AF_INET, SOCK_STREAM)
-                hostn = filename.partition('/')[0]
-                try:
+
+            try:
+                # Parse client request
+                requestLine, requestHeaders = parse_http_headers(cliSock_f)
+                if not requestLine:
+                    tcpCliSock.close()
+                    continue
+
+                method, requestUri, _ = requestLine.split()
+                uri_parts = requestUri.partition('http://')
+                if uri_parts[1] == '':
+                    filename = requestUri.partition('/')[2]
+                else:
+                    filename = uri_parts[2]
+
+                # Determine caching logic
+                if method == "GET":
+                    fileCachePath = os.path.join(cacheDir, filename.replace('/', '_'))
+                    cached = os.path.exists(fileCachePath)
+                else:
+                    fileCachePath = None
+                    cached = False
+
+                # Serve from cache if available
+                if cached and fileCachePath:
+                    with open(fileCachePath, 'rb') as cache_file:
+                        cliSock_f.write(cache_file.read())
+                    print(f"Served from cache: {fileCachePath}")
+                else:
+                    # Forward request to server
+                    hostn = filename.partition('/')[0]
+                    c = socket(AF_INET, SOCK_STREAM)
                     c.connect((hostn, 80))
                     fileobj = c.makefile('rwb', 0)
                     forward_request(fileobj, f'/{filename.partition("/")[2]}', hostn, requestLine, requestHeaders, cliSock_f)
+
+                    # Cache and forward response
                     forward_and_cache_response(fileobj, fileCachePath, cliSock_f)
-                except Exception as e:
-                    print(f"Error connecting to host {hostn}: {e}")
-                finally:
                     c.close()
-            cliSock_f.close()
-            tcpCliSock.close()
+            except Exception as e:
+                print(f"Error handling client request: {e}")
+            finally:
+                cliSock_f.close()
+                tcpCliSock.close()
     except KeyboardInterrupt:
-        pass
+        print("\nShutting down proxy server.")
     finally:
-        if tcpCliSock:
-            tcpCliSock.close()
         tcpSerSock.close()
-    sys.exit()
 
 if __name__ == "__main__":
     proxyServer(8888)
