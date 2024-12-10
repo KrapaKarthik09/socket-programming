@@ -58,7 +58,7 @@ def forward_and_cache_response(sockf, fileCachePath, clisockf):
         clisockf.write(b"\r\n")
         
         while True:
-            data = sockf.read(4096)
+            data = interruptible_read(sockf,4096)
             if not data:
                 break
             clisockf.write(data)
