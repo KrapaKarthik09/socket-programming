@@ -102,72 +102,66 @@ def proxyServer(port):
     tcpSerSock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     tcpSerSock.bind(('', port))
     tcpSerSock.listen(5)
-    tcpSerSock.settimeout(1)
 
     print(f'Proxy server is running on port {port}')
 
-    try:
-        while True:
-            try:
-                tcpCliSock, addr = tcpSerSock.accept()
-                print(f'Received a connection from: {addr}')
-                cliSock_f = tcpCliSock.makefile('rwb', 0)
-                
-                requestLine, requestHeaders = parse_http_headers(cliSock_f)
-                print(requestLine)
-                
-                if len(requestLine) == 0:
-                    continue
-                
-                method, requestUri, _ = requestLine.split()
-                uri_parts = requestUri.partition('http://')
-                
-                if uri_parts[1] == '':
-                    filename = requestUri.partition('/')[2]
-                else:
-                    filename = uri_parts[2]
-                
-                print(f'filename: {filename}')
-                
-                if len(filename) > 0:
-                    fileCachePath = os.path.join(cacheDir, filename.replace('/', '_'))
-                    cached = os.path.exists(fileCachePath) and method == "GET"
-                    
-                    if cached:
-                        with open(fileCachePath, 'rb') as cache_file:
-                            cliSock_f.write(cache_file.read())
-                        print('Read from cache')
-                    else:
-                        c = socket(AF_INET, SOCK_STREAM)
-                        c.settimeout(10)
-                        hostn = filename.partition('/')[0]
-                        
-                        try:
-                            c.connect((hostn.split(':')[0], int(hostn.split(':')[1]) if ':' in hostn else 80))
-                            fileobj = c.makefile('rwb', 0)
-                            
-                            body = None
-                            if method == "POST":
-                                content_length = next((int(h[1]) for h in requestHeaders if h[0].lower() == 'content-length'), 0)
-                                body = interruptible_read(cliSock_f, content_length)
-                            
-                            forward_request(fileobj, f'/{filename.partition("/")[2]}', hostn, requestLine, requestHeaders, method, body)
-                            forward_and_cache_response(fileobj, fileCachePath if method == "GET" else None, cliSock_f)
-                        
-                        except Exception as e:
-                            print(f"Error handling request: {e}")
-                        finally:
-                            c.close()
-            except TimeoutError:
+    while True:
+        try:
+            tcpCliSock, addr = tcpSerSock.accept()
+            print(f'Received a connection from: {addr}')
+            cliSock_f = tcpCliSock.makefile('rwb', 0)
+            
+            requestLine, requestHeaders = parse_http_headers(cliSock_f)
+            print(requestLine)
+            
+            if len(requestLine) == 0:
                 continue
-            except Exception as e:
-                print(f"Error accepting connection: {e}")
-            finally:
-                tcpCliSock.close()
-    except KeyboardInterrupt:
-        print("Proxy server is shutting down")
-    finally:
-        tcpSerSock.close()
+            
+            method, requestUri, _ = requestLine.split()
+            uri_parts = requestUri.partition('http://')
+            
+            if uri_parts[1] == '':
+                filename = requestUri.partition('/')[2]
+            else:
+                filename = uri_parts[2]
+            
+            print(f'filename: {filename}')
+            
+            if len(filename) > 0:
+                fileCachePath = os.path.join(cacheDir, filename.replace('/', '_'))
+                cached = os.path.exists(fileCachePath) and method == "GET"
+                
+                if cached:
+                    with open(fileCachePath, 'rb') as cache_file:
+                        cliSock_f.write(cache_file.read())
+                    print('Read from cache')
+                else:
+                    c = socket(AF_INET, SOCK_STREAM)
+                    hostn = filename.partition('/')[0]
+                    
+                    try:
+                        c.connect((hostn.split(':')[0], int(hostn.split(':')[1]) if ':' in hostn else 80))
+                        fileobj = c.makefile('rwb', 0)
+                        
+                        body = None
+                        if method == "POST":
+                            content_length = next((int(h[1]) for h in requestHeaders if h[0].lower() == 'content-length'), 0)
+                            body = interruptible_read(cliSock_f, content_length)
+                        
+                        forward_request(fileobj, f'/{filename.partition("/")[2]}', hostn, requestLine, requestHeaders, method, body)
+                        forward_and_cache_response(fileobj, fileCachePath if method == "GET" else None, cliSock_f)
+                    
+                    except Exception as e:
+                        print(f"Error handling request: {e}")
+                    finally:
+                        c.close()
+        except Exception as e:
+            print(f"Error accepting connection: {e}")
+        finally:
+            tcpCliSock.close()
+
+    tcpSerSock.close()
+    sys.exit()
 
 if __name__ == "__main__":
     proxyServer(8888)
