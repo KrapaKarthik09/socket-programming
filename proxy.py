@@ -39,124 +39,120 @@ def parse_http_headers(sockf):
         if headerPartitions[1] == '':
             continue
         headers.append((headerPartitions[0].strip(), headerPartitions[2].strip()))
-    return(headline, headers)
+    return (headline, headers)
 
 def forward_and_cache_response(sockf, fileCachePath, clisockf):
     cachef = None
     if fileCachePath is not None:
         os.makedirs(os.path.dirname(fileCachePath), exist_ok=True)
         cachef = open(fileCachePath, 'w+b')
-
     try:
         statusLine, headers = parse_http_headers(sockf)
-        headers = [h for h in headers if h[0] != 'Connection']
+        headers = [h for h in headers if h[0].lower() != 'connection']
         headers.append(('Connection', 'close'))
-        # Fill in start.
+
         clisockf.write(f"{statusLine}\r\n".encode())
         for header in headers:
             clisockf.write(f"{header[0]}: {header[1]}\r\n".encode())
         clisockf.write(b"\r\n")
-        
+
         while True:
-            data = interruptible_read(sockf,4096)
+            data = interruptible_read(sockf, 4096)
             if not data:
                 break
             clisockf.write(data)
             if cachef:
                 cachef.write(data)
-        # Fill in end.
     except Exception as e:
         print(e)
     finally:
         if cachef is not None:
             cachef.close()
 
-def forward_request(sockf, requestUri, hostn, origRequestLine, origHeaders):
-    headers = [h for h in origHeaders if h[0] != 'Host']
+def forward_request(sockf, requestUri, hostn, origRequestLine, origHeaders, method, body=None):
+    headers = [h for h in origHeaders if h[0].lower() != 'host']
     headers.append(('Host', hostn))
-    # Fill in start.
+
     sockf.write(f"{origRequestLine}\r\n".encode())
     for header in headers:
         sockf.write(f"{header[0]}: {header[1]}\r\n".encode())
+    
+    if method == "POST":
+        sockf.write(f"Content-Length: {len(body)}\r\n".encode())
+    
     sockf.write(b"\r\n")
-    # Fill in end.
+    
+    if method == "POST" and body:
+        sockf.write(body)
 
 def proxyServer(port):
     if os.path.isdir(cacheDir):
         shutil.rmtree(cacheDir)
-    tcpSerSock = socket(AF_INET, SOCK_STREAM)
+    os.makedirs(cacheDir, exist_ok=True)
 
-    # Fill in start.
+    tcpSerSock = socket(AF_INET, SOCK_STREAM)
     tcpSerSock.bind(('', port))
     tcpSerSock.listen(1)
-    # Fill in end.
 
-    tcpCliSock = None
-    try:
-        while 1:
-            print('Ready to serve...')
-            tcpCliSock, addr = interruptible_accept(tcpSerSock)
-
-            print('Received a connection from:', addr)
-            cliSock_f = tcpCliSock.makefile('rwb', 0)
-
+    while 1:
+        print('Ready to serve...')
+        tcpCliSock, addr = interruptible_accept(tcpSerSock)
+        print('Received a connection from:', addr)
+        cliSock_f = tcpCliSock.makefile('rwb', 0)
+        
+        try:
             requestLine, requestHeaders = parse_http_headers(cliSock_f)
             print(requestLine)
-
+            
             if len(requestLine) == 0:
                 continue
-
-            requestUri = requestLine.split()[1]
+            
+            method, requestUri, _ = requestLine.split()
             uri_parts = requestUri.partition('http://')
+            
             if uri_parts[1] == '':
                 filename = requestUri.partition('/')[2]
             else:
                 filename = uri_parts[2]
-
+            
             print(f'filename: {filename}')
-
+            
             if len(filename) > 0:
-                method = requestLine.split()[0]
-                if method == "GET":
-                    fileCachePath = os.path.join(cacheDir, filename.replace('/', '_'))
-                    cached = os.path.exists(fileCachePath)
-                else:
-                    fileCachePath = None
-                    cached = False
-
-                print(f'fileCachePath: {fileCachePath}')
-
-                if fileCachePath is not None and cached:
-                    # Fill in start.
+                fileCachePath = os.path.join(cacheDir, filename.replace('/', '_'))
+                cached = os.path.exists(fileCachePath) and method == "GET"
+                
+                if cached:
                     with open(fileCachePath, 'rb') as cache_file:
                         cliSock_f.write(cache_file.read())
-                    # Fill in end.
                     print('Read from cache')
                 else:
-                    c = socket(AF_INET, SOCK_STREAM)  # Fill in start.
+                    c = socket(AF_INET, SOCK_STREAM)
                     hostn = filename.partition('/')[0]
                     print(f'hostn: {hostn}')
-
+                    
                     try:
-                        # Fill in start.
-                        c.connect((hostn.split(':')[0], int(hostn.split(':')[1])))
-                        # Fill in end.
-
+                        c.connect((hostn.split(':')[0], int(hostn.split(':')[1]) if ':' in hostn else 80))
                         fileobj = c.makefile('rwb', 0)
-                        forward_request(fileobj, f'/{filename.partition("/")[2]}', hostn, requestLine, requestHeaders)
-
-                        forward_and_cache_response(fileobj, fileCachePath, cliSock_f)
+                        
+                        body = None
+                        if method == "POST":
+                            content_length = next((int(h[1]) for h in requestHeaders if h[0].lower() == 'content-length'), 0)
+                            body = interruptible_read(cliSock_f, content_length)
+                        
+                        forward_request(fileobj, f'/{filename.partition("/")[2]}', hostn, requestLine, requestHeaders, method, body)
+                        forward_and_cache_response(fileobj, fileCachePath if method == "GET" else None, cliSock_f)
+                    
                     except Exception as e:
                         print(e)
                     finally:
                         c.close()
+        
+        except Exception as e:
+            print(f"Error handling request: {e}")
+        finally:
             tcpCliSock.close()
-    except KeyboardInterrupt:
-        pass
 
-    # Fill in start.
     tcpSerSock.close()
-    # Fill in end.
     sys.exit()
 
 if __name__ == "__main__":
