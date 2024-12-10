@@ -4,22 +4,22 @@ import os
 import shutil
 import select
 
-# Cache directory for storing cached responses
+# Directory for storing cached responses
 cacheDir = os.path.join(os.path.dirname(__file__), 'cache')
 
-# Wait function with interruptible timeout
+# Helper function for interruptible operations
 def wait_interruptible(waitable, timeLeft=10):
     ready = select.select([waitable], [], [], timeLeft)
     if not ready[0]:
         raise TimeoutError("Timeout waiting for connection or data")
 
-def interruptible_accept(socket):
-    wait_interruptible(socket)
-    return socket.accept()
+def interruptible_accept(sock):
+    wait_interruptible(sock)
+    return sock.accept()
 
-def interruptible_recv(socket, nbytes):
-    wait_interruptible(socket)
-    return socket.recv(nbytes)
+def interruptible_recv(sock, nbytes):
+    wait_interruptible(sock)
+    return sock.recv(nbytes)
 
 def interruptible_readline(fileObj):
     wait_interruptible(fileObj)
@@ -40,7 +40,7 @@ def parse_http_headers(sockf):
         if headerPartitions[1] == '':
             continue
         headers.append((headerPartitions[0].strip(), headerPartitions[2].strip()))
-    return (headline, headers)
+    return headline, headers
 
 def forward_and_cache_response(sockf, fileCachePath, clisockf):
     cachef = None
@@ -58,6 +58,7 @@ def forward_and_cache_response(sockf, fileCachePath, clisockf):
         response += b"\r\n"
 
         clisockf.write(response)
+        clisockf.flush()
         if cachef:
             cachef.write(response)
 
@@ -66,17 +67,17 @@ def forward_and_cache_response(sockf, fileCachePath, clisockf):
             if not data:
                 break
             clisockf.write(data)
+            clisockf.flush()
             if cachef:
                 cachef.write(data)
         
-        clisockf.flush()
     except Exception as e:
         print(f"Error in forward_and_cache_response: {e}")
     finally:
         if cachef:
             cachef.close()
 
-def forward_request(sockf, requestUri, hostn, origRequestLine, origHeaders, method, body=None):
+def forward_request(sock, requestUri, hostn, origRequestLine, origHeaders, method, body=None):
     headers = [h for h in origHeaders if h[0].lower() != 'host']
     headers.append(('Host', hostn))
 
@@ -92,7 +93,7 @@ def forward_request(sockf, requestUri, hostn, origRequestLine, origHeaders, meth
     if method == "POST" and body:
         request += body
 
-    sockf.sendall(request)
+    sock.sendall(request)
 
 def handle_client(tcpCliSock):
     cliSock_f = tcpCliSock.makefile('rwb', 0)
