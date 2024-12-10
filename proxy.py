@@ -139,7 +139,7 @@ def proxyServer(port):
 
                     try:
                         # Fill in start.
-                        c.connect((hostn, 80))
+                        c.connect((hostn.split(':')[0], int(hostn.split(':')[1])))
                         # Fill in end.
 
                         fileobj = c.makefile('rwb', 0)
